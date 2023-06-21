@@ -27,6 +27,11 @@ class AuthRepository:
                     expires_delta=access_token_expires
                 )
 
-                return {"access_token": access_token, "token_type": "bearer"}
+                return {"access_token": access_token, "token_type": "bearer", "user": {
+                    "id_user": userDb.id_user,
+                    "name": userDb.name,
+                    "last_name": userDb.last_name,
+                    "email": userDb.email
+                }}
         except HTTPException as e:
             raise HTTPException(status_code=e.status_code, detail=f"{str(e.detail)}")
