@@ -12,12 +12,22 @@ class Users(db.Entity):
     status = Required(int)
 
 
+class Countries(db.Entity):
+    id_country = PrimaryKey(int, auto=True)
+    name = Required(str)
+    licenses = Set('Licenses')
+
+    def todict(self):
+        return {
+            'id_country': self.id_country,
+            'name': self.name
+        }
 
 
 class Licenses(db.Entity):
     id_license = PrimaryKey(int, auto=True)
     type = Required(int)
-    fk_country_id = Required(int)
+    fk_country_id = Required(Countries)
     name_unit = Required(str)
     key = Required(str, unique=True)
     date_expiration = Required(datetime)
@@ -28,7 +38,7 @@ class Licenses(db.Entity):
         return {
             'id_license': self.id_license,
             'type': self.type,
-            'fk_country_id': self.fk_country_id,
+            'fk_country_id': self.fk_country_id.todict(),
             'name_unit': self.name_unit,
             'key': self.key,
             'date_expiration': self.date_expiration.strftime('%Y-%m-%d %H:%M:%S'),

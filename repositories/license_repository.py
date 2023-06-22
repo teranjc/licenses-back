@@ -2,8 +2,8 @@ import datetime
 
 from fastapi import HTTPException, status
 from pony.orm import db_session, select, desc, commit
-from models.schemas import Licenses as LicenseModel
-from entities.license_managment import Licenses
+from models.schemas import Licenses as LicenseModel, LicensesDisabled
+from entities.license_managment import Licenses, Countries
 
 
 class LicenseRepository:
@@ -37,7 +37,13 @@ class LicenseRepository:
             with db_session:
                 licence_db = select(l for l in Licenses if l.key == license.key).get()
                 if licence_db is None:
-                    new_license = Licenses(type=license.type, fk_country_id=license.fk_country_id,
+                    country = select(c for c in Countries if c.id_country == license.fk_country_id).get()
+
+                    if country is None:
+                        raise HTTPException(status_code=202, detail=f"El estado no se encuentra registrado"
+                                            )
+
+                    new_license = Licenses(type=license.type, fk_country_id=country,
                                            name_unit=license.name_unit, key=license.key,
                                            date_expiration=license.date_expiration,
                                            date_created=datetime.datetime.now(), status=1)
@@ -65,7 +71,11 @@ class LicenseRepository:
                     licence_db.type = license.type
 
                 if license.fk_country_id is not None:
-                    licence_db.fk_country_id = license.fk_country_id
+                    country = select(c for c in Countries if c.id_country == license.fk_country_id).get()
+                    if country is None:
+                        raise HTTPException(status_code=202, detail=f"El estado no se encuentra registrado"
+                                            )
+                    licence_db.fk_country_id = country
 
                 if license.name_unit is not None:
                     licence_db.name_unit = license.name_unit
@@ -90,20 +100,18 @@ class LicenseRepository:
         except HTTPException as e:
             raise HTTPException(status_code=e.status_code, detail=f"{str(e.detail)}")
 
-    def delete_licenses(license: LicenseModel):
+    def delete_licenses(license: LicensesDisabled):
         try:
             with db_session:
-                licence_db = Licenses.get(id_license=license.id_license)
+                licence_db = select(l for l in Licenses if l.id_license == license.id_license).get()
                 if licence_db is None:
                     raise HTTPException(status_code=404, detail="La licencia no se encuentra registrada")
-
                 # Actualizar los campos solo si se proporcionan en la solicitud
-                licence_db.delete()
-
+                # TODO realizar la conexion al contenedor y bajarlo
+                licence_db.set(status=5)
                 commit()
-
                 return {
-                    "response": "Registro e"
+                    "response": "Licencia Eliminada correctamente"
                 }
 
         except HTTPException as e:
