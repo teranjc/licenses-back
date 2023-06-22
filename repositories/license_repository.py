@@ -14,11 +14,11 @@ class LicenseRepository:
 
                 list_licenses = list()
 
-                licenses = select(l for l in Licenses).order_by(desc(Licenses.id_license))
+                licenses = select(l for l in Licenses)
                 for license in licenses:
                     list_licenses.append({
                         "id_license": license.id_license, "type": license.type,
-                        "fk_country_id": license.fk_country_id,
+                        "fk_country_id": license.fk_country_id.todict(),
                         "name_unit": license.name_unit,
                         "key": license.key,
                         "date_expiration": license.date_expiration,
