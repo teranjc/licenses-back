@@ -21,6 +21,7 @@ async def create_licenses(model: LicenseModel, current_user: Users = Depends(get
     except HTTPException as e:
         raise HTTPException(status_code=e.status_code, detail={"status": e.status_code, "message": e.detail})
 
+
 @license_route.put("/licenses", status_code=status.HTTP_200_OK)
 async def updated_licenses(model: LicenseModel, current_user: Users = Depends(get_current_user), ):
     try:
@@ -28,7 +29,16 @@ async def updated_licenses(model: LicenseModel, current_user: Users = Depends(ge
     except HTTPException as e:
         raise HTTPException(status_code=e.status_code, detail={"status": e.status_code, "message": e.detail})
 
+
 @license_route.delete("/licenses", status_code=status.HTTP_200_OK)
+async def updated_licenses(model: LicensesDisabled, current_user: Users = Depends(get_current_user), ):
+    try:
+        return LicenseRepository.delete_licenses(model, current_user)
+    except HTTPException as e:
+        raise HTTPException(status_code=e.status_code, detail={"status": e.status_code, "message": e.detail})
+
+
+@license_route.put("/licenses/pause", status_code=status.HTTP_200_OK)
 async def updated_licenses(model: LicensesDisabled, current_user: Users = Depends(get_current_user), ):
     try:
         return LicenseRepository.delete_licenses(model)

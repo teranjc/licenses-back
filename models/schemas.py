@@ -64,6 +64,7 @@ class Licenses(BaseModel):
 
 class LicensesDisabled(BaseModel):
     id_license: int
+    password: str
 
 
 class Login(BaseModel):

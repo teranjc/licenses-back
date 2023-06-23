@@ -3,7 +3,8 @@ import datetime
 from fastapi import HTTPException, status
 from pony.orm import db_session, select, desc, commit
 from models.schemas import Licenses as LicenseModel, LicensesDisabled
-from entities.license_managment import Licenses, Countries
+from entities.license_managment import Licenses, Countries, Users
+from config.utils import Hash
 
 
 class LicenseRepository:
@@ -100,7 +101,36 @@ class LicenseRepository:
         except HTTPException as e:
             raise HTTPException(status_code=e.status_code, detail=f"{str(e.detail)}")
 
-    def delete_licenses(license: LicensesDisabled):
+    def delete_licenses(license: LicensesDisabled, user: Users):
+        try:
+            with db_session:
+                licence_db = select(l for l in Licenses if l.id_license == license.id_license).get()
+                if licence_db is None:
+                    raise HTTPException(status_code=404, detail="La licencia no se encuentra registrada")
+
+                user_db = select(u for u in Users if user.id_user == u.id_user).get()
+                if user_db is None:
+                    raise HTTPException(status_code=404, detail="El usuario no esta registrado")
+
+
+                if not Hash.verify_password(license.password, user_db.password):
+                    raise HTTPException(
+                        status_code=status.HTTP_202_ACCEPTED,
+                        detail=f"La clave es incorrecta"
+                    )
+                # Actualizar los campos solo si se proporcionan en la solicitud
+                # TODO realizar la conexion al contenedor y bajarlo
+
+                licence_db.set(status=4)
+                commit()
+                return {
+                    "response": "Licencia Eliminada correctamente"
+                }
+
+        except HTTPException as e:
+            raise HTTPException(status_code=e.status_code, detail=f"{str(e.detail)}")
+
+    def pause_license(license: LicensesDisabled):
         try:
             with db_session:
                 licence_db = select(l for l in Licenses if l.id_license == license.id_license).get()
@@ -108,7 +138,25 @@ class LicenseRepository:
                     raise HTTPException(status_code=404, detail="La licencia no se encuentra registrada")
                 # Actualizar los campos solo si se proporcionan en la solicitud
                 # TODO realizar la conexion al contenedor y bajarlo
-                licence_db.set(status=5)
+                licence_db.set(status=3)
+                commit()
+                return {
+                    "response": "Licencia Eliminada correctamente"
+                }
+
+        except HTTPException as e:
+            raise HTTPException(status_code=e.status_code, detail=f"{str(e.detail)}")
+
+    def resume_license(license: LicensesDisabled):
+        try:
+            with db_session:
+                licence_db = select(l for l in Licenses if l.id_license == license.id_license).get()
+                if licence_db is None:
+                    raise HTTPException(status_code=404, detail="La licencia no se encuentra registrada")
+
+                # Actualizar los campos solo si se proporcionan en la solicitud
+                # TODO realizar la conexion al contenedor y bajarlo
+                licence_db.set(status=3)
                 commit()
                 return {
                     "response": "Licencia Eliminada correctamente"
