@@ -47,7 +47,9 @@ class LicenseRepository:
                     new_license = Licenses(type=license.type, fk_country_id=country,
                                            name_unit=license.name_unit, key=license.key,
                                            date_expiration=license.date_expiration,
-                                           date_created=datetime.datetime.now(), status=1)
+                                           date_created=datetime.datetime.now(), status=1
+                                           , is_redeemed=False
+                                           )
 
                     commit()
                 else:
@@ -185,6 +187,29 @@ class LicenseRepository:
                 commit()
                 return {
                     "response": "Licencia renovada correctamente"
+                }
+
+        except HTTPException as e:
+            raise HTTPException(status_code=e.status_code, detail=f"{str(e.detail)}")
+
+    def validate_license(license: LicensesDisabled):
+        try:
+            with db_session:
+                licence_db = select(l for l in Licenses if l.key == license.key).get()
+                if licence_db is None:
+                    raise HTTPException(status_code=404, detail="Esta licencia no es valida")
+
+                if licence_db.is_redeemed:
+                    raise HTTPException(status_code=200, detail="Esta licencia ya ha sido canjeada")
+
+                if licence_db.date_expiration <= datetime.datetime.now():
+                    raise HTTPException(status_code=200, detail="Esta licencia ya ha expirado")
+
+                licence_db.set(is_redeemed=True)
+                commit()
+                return {
+                    "response": "Licencia activada correctamente",
+                    "date_expiration": licence_db.date_expiration
                 }
 
         except HTTPException as e:

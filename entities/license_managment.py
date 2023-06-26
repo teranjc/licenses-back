@@ -33,6 +33,7 @@ class Licenses(db.Entity):
     date_expiration = Required(datetime)
     date_created = Required(datetime)
     status = Required(int)
+    is_redeemed = Required(bool)
 
     def todict(self):
         return {

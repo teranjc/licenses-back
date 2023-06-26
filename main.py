@@ -1,6 +1,8 @@
 import asyncio
 import json
-
+import stat
+from fastapi.responses import HTMLResponse
+from fastapi import Request
 from asyncssh import SSHServerSession
 from fastapi import FastAPI, WebSocket
 from dotenv import load_dotenv
@@ -10,7 +12,6 @@ from starlette.middleware.cors import CORSMiddleware
 from routes.auth_route import auth_route
 from routes.license_route import license_route
 from routes.user_route import user_route
-
 
 app = FastAPI()
 app.add_middleware(
@@ -26,46 +27,87 @@ app.add_middleware(
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    # Crear instancia de SSHClient
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    # Configura la conexión SSH con los detalles del servidor remoto
-    ssh.connect("192.168.100.160", port=4565, username='root', password='root')
-    current_directory = '/'
+    # Conectar al servidor SSH
+    client.connect("192.168.100.160", port=4565, username='root', password='root')
+    # Crear instancia de SFTPClient
+    sftp = client.open_sftp()
+
+    # Directorio actual
+    current_directory = "/"
 
     try:
         while True:
-            data = await websocket.receive_text()
-            if not data:
+            # Leer el comando del cliente WebSocket
+            command = await websocket.receive_text()
+
+            if command.lower() == "exit":
+                # Salir del bucle si se ingresa "exit"
                 break
 
-            message = json.loads(data)
-            print(data)
-            command = message['command']
-            directory = message['currentDirectory']
-            print(directory)
-            if directory:
-                # Cambiar al directorio especificado
-                command = f'cd {directory} && {command}'
+            if command.lower().startswith("cd"):
+                # Cambiar de directorio
+                _, path = command.split(" ", 1)
+                if path == "..":
+                    # Retroceder un nivel
+                    current_directory = "/".join(current_directory.split("/")[:-1])
+                elif path.startswith("/"):
+                    # Directorio absoluto
+                    try:
+                        attributes = sftp.lstat(path)
+                        if stat.S_ISDIR(attributes.st_mode):
+                            current_directory = path
+                            await websocket.send_text(current_directory)  # Enviar la ruta del directorio actual
+                        else:
+                            await websocket.send_text(f"{path} no es un directorio válido.")
+                    except FileNotFoundError:
+                        await websocket.send_text(f"{path} no existe.")
+                    except Exception as e:
+                        await websocket.send_text(f"Error al verificar el directorio: {e}")
+                else:
+                    # Directorio relativo
+                    path = current_directory + "/" + path
+                    try:
+                        attributes = sftp.lstat(path)
+                        if stat.S_ISDIR(attributes.st_mode):
+                            current_directory = path
+                            await websocket.send_text(current_directory)  # Enviar la ruta del directorio actual
+                        else:
+                            await websocket.send_text(f"{path} no es un directorio válido.")
+                    except FileNotFoundError:
+                        await websocket.send_text(f"{path} no existe.")
+                    except Exception as e:
+                        await websocket.send_text(f"Error al verificar el directorio: {e}")
+            else:
+                # Ejecutar el comando en la terminal remota
+                stdin, stdout, stderr = client.exec_command(f"cd {current_directory}; {command}")
 
-            stdin, stdout, stderr = ssh.exec_command(command)
-            output = stdout.read().decode('utf-8')
-            error = stderr.read().decode('utf-8')
+                # Leer la salida del comando
+                output = stdout.read().decode('utf-8')
+                error = stderr.read().decode('utf-8')
 
-            if command.startswith('cd'):
-                # Obtener el directorio actual después de cambiarlo
-                stdin, stdout, stderr = ssh.exec_command('pwd')
-                current_directory = stdout.read().decode('utf-8').strip()
+                if output:
+                    await websocket.send_text(output)
 
-            response = {
-                'output': output,
-                'error': error,
-                'currentDirectory': current_directory
-            }
-            await websocket.send_text(json.dumps(response))
+                if error:
+                    await websocket.send_text(error)
+
+                # Enviar la ruta del directorio actual después de ejecutar el comando
+                await websocket.send_text(current_directory)
 
     finally:
-        ssh.close()
+        # Cerrar la conexión SSH y SFTP
+        sftp.close()
+        client.close()
+
+
+@app.get("/")
+async def index(request: Request):
+    return HTMLResponse(open("index.html").read())
+
 
 load_dotenv()
 app.include_router(auth_route, prefix="/api")

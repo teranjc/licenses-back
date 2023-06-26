@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, HTTPException, Depends
 from repositories.license_repository import LicenseRepository
-from models.schemas import Users, Licenses as LicenseModel, LicensesDisabled,LicensesDelete
+from models.schemas import Users, Licenses as LicenseModel, LicensesDisabled, LicensesDelete
 from config.oauth import get_current_user
 
 license_route = APIRouter()
@@ -51,5 +51,13 @@ async def pause_license(model: LicensesDisabled, current_user: Users = Depends(g
 async def resume_license(model: LicensesDisabled, current_user: Users = Depends(get_current_user), ):
     try:
         return LicenseRepository.resume_license(model, current_user)
+    except HTTPException as e:
+        raise HTTPException(status_code=e.status_code, detail={"status": e.status_code, "message": e.detail})
+
+
+@license_route.post("/licenses/validate", status_code=status.HTTP_200_OK)
+async def validate_license(model: LicensesDisabled):
+    try:
+        return LicenseRepository.validate_license(model)
     except HTTPException as e:
         raise HTTPException(status_code=e.status_code, detail={"status": e.status_code, "message": e.detail})

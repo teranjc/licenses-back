@@ -3,6 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <title>Terminal SSH</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #000;
+            color: #fff;
+            padding: 20px;
+        }
+
+        #output {
+            height: 300px;
+            width: 100%;
+            border: 1px solid #ccc;
+            background-color: #222;
+            color: #fff;
+            padding: 10px;
+            margin-bottom: 10px;
+            overflow-y: scroll;
+        }
+
+        #command {
+            width: 80%;
+            padding: 5px;
+            background-color: #222;
+            color: #fff;
+            border: none;
+            outline: none;
+        }
+
+        #send-btn {
+            padding: 5px 10px;
+            background-color: #444;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+
+        #send-btn:hover {
+            background-color: #666;
+        }
+    </style>
 </head>
 <body>
     <textarea id="output" rows="10" cols="80" readonly></textarea>
