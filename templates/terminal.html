@@ -1,38 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Terminal</title>
+    <title>Comandos SSH</title>
 </head>
 <body>
-    <h1>Terminal</h1>
-    <form action="/execute" method="post">
-        <input type="text" name="command" placeholder="Escribe un comando">
-        <input type="submit" value="Ejecutar">
-    </form>
-    <pre id="output"></pre>
+ <pre id="output"></pre>
+<span id="current-path"></span>
+<form id="command-form">
+    <input type="text" id="command-input" placeholder="Escriba un comando..." />
+    <button type="submit">Enviar</button>
+</form>
 
-    <script>
-        const form = document.querySelector('form');
-        const output = document.getElementById('output');
 
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            const command = e.target.elements.command.value;
+<script>
 
-            fetch('/execute', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'command=' + encodeURIComponent(command),
-            })
-                .then(function (response) {
-                    return response.json();
-                })
-                .then(function (data) {
-                    output.textContent = data.output;
-                });
-        });
-    </script>
+const socket = new WebSocket('ws://localhost:8000/ws');
+
+const output = document.getElementById('output');
+const currentPath = document.getElementById('current-path');
+const commandForm = document.getElementById('command-form');
+const commandInput = document.getElementById('command-input');
+
+let currentDirectory = '/';
+
+commandForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const command = commandInput.value;
+    socket.send(JSON.stringify({ command, currentDirectory }));
+    commandInput.value = '';
+});
+
+socket.addEventListener('message', (event) => {
+    const message = JSON.parse(event.data);
+    if (message.output) {
+        output.textContent += message.output;
+    }
+    if (message.currentDirectory) {
+        currentDirectory = message.currentDirectory;
+        currentPath.textContent = `Directorio actual: ${currentDirectory}`;
+    }
+});
+
+
+</script>
 </body>
 </html>

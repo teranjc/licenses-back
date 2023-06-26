@@ -1,12 +1,16 @@
-from fastapi import FastAPI,WebSocket,WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+import asyncio
+import json
+
+from asyncssh import SSHServerSession
+from fastapi import FastAPI, WebSocket
 from dotenv import load_dotenv
 import uvicorn
+import paramiko
 from starlette.middleware.cors import CORSMiddleware
-
 from routes.auth_route import auth_route
 from routes.license_route import license_route
 from routes.user_route import user_route
+
 
 app = FastAPI()
 app.add_middleware(
@@ -16,89 +20,57 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-html = """
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>Chat</title>
-    </head>
-    <body>
-        <h1>WebSocket Chat</h1>
-        <h2>Your ID: <span id="ws-id"></span></h2>
-        <form action="" onsubmit="sendMessage(event)">
-            <input type="text" id="messageText" autocomplete="off"/>
-            <button>Send</button>
-        </form>
-        <ul id='messages'>
-        </ul>
-        <script>
-            var client_id = Date.now()
-            document.querySelector("#ws-id").textContent = client_id;
-            var ws = new WebSocket(`ws://localhost:8000/ws/${client_id}`);
-            ws.onmessage = function(event) {
-                var messages = document.getElementById('messages')
-                var message = document.createElement('li')
-                var content = document.createTextNode(event.data)
-                message.appendChild(content)
-                messages.appendChild(message)
-            };
-            function sendMessage(event) {
-                var input = document.getElementById("messageText")
-                ws.send(input.value)
-                input.value = ''
-                event.preventDefault()
-            }
-        </script>
-    </body>
-</html>
-"""
 
 
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
 
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
+    # Configura la conexión SSH con los detalles del servidor remoto
+    ssh.connect("192.168.100.160", port=4565, username='root', password='root')
+    current_directory = '/'
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-
-manager = ConnectionManager()
-
-
-@app.get("/")
-async def get():
-    return HTMLResponse(html)
-
-
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: int):
-    await manager.connect(websocket)
     try:
         while True:
             data = await websocket.receive_text()
-            await manager.send_personal_message(f"You wrote: {data}", websocket)
-            await manager.broadcast(f"Client #{client_id} says: {data}")
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-        await manager.broadcast(f"Client #{client_id} left the chat")
+            if not data:
+                break
+
+            message = json.loads(data)
+            print(data)
+            command = message['command']
+            directory = message['currentDirectory']
+            print(directory)
+            if directory:
+                # Cambiar al directorio especificado
+                command = f'cd {directory} && {command}'
+
+            stdin, stdout, stderr = ssh.exec_command(command)
+            output = stdout.read().decode('utf-8')
+            error = stderr.read().decode('utf-8')
+
+            if command.startswith('cd'):
+                # Obtener el directorio actual después de cambiarlo
+                stdin, stdout, stderr = ssh.exec_command('pwd')
+                current_directory = stdout.read().decode('utf-8').strip()
+
+            response = {
+                'output': output,
+                'error': error,
+                'currentDirectory': current_directory
+            }
+            await websocket.send_text(json.dumps(response))
+
+    finally:
+        ssh.close()
 
 load_dotenv()
 app.include_router(auth_route, prefix="/api")
 app.include_router(license_route, prefix="/api")
 app.include_router(user_route, prefix="/api")
-
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

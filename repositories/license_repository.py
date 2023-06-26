@@ -115,7 +115,7 @@ class LicenseRepository:
                 if not Hash.verify_password(license.password, user_db.password):
                     raise HTTPException(
                         status_code=status.HTTP_202_ACCEPTED,
-                        detail=f"La clave es incorrecta"
+                        detail=f"La contraseña es incorrecta"
                     )
                 # Actualizar los campos solo si se proporcionan en la solicitud
                 # TODO realizar la conexion al contenedor y bajarlo
@@ -143,7 +143,7 @@ class LicenseRepository:
                 if not Hash.verify_password(license.password, user_db.password):
                     raise HTTPException(
                         status_code=status.HTTP_202_ACCEPTED,
-                        detail=f"La clave es incorrecta"
+                        detail=f"La contraseña es incorrecta"
                     )
                 # Actualizar los campos solo si se proporcionan en la solicitud
                 # TODO realizar la conexion al contenedor y bajarlo
@@ -170,7 +170,7 @@ class LicenseRepository:
                 if not Hash.verify_password(license.password, user_db.password):
                     raise HTTPException(
                         status_code=status.HTTP_202_ACCEPTED,
-                        detail=f"La clave es incorrecta"
+                        detail=f"La contraseña es incorrecta"
                     )
                 # Actualizar los campos solo si se proporcionan en la solicitud
                 # TODO realizar la conexion al contenedor y bajarlo
