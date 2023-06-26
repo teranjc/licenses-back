@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Terminal</title>
+</head>
+<body>
+    <h1>Terminal</h1>
+    <form action="/execute" method="post">
+        <input type="text" name="command" placeholder="Escribe un comando">
+        <input type="submit" value="Ejecutar">
+    </form>
+    <pre id="output"></pre>
+
+    <script>
+        const form = document.querySelector('form');
+        const output = document.getElementById('output');
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const command = e.target.elements.command.value;
+
+            fetch('/execute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'command=' + encodeURIComponent(command),
+            })
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (data) {
+                    output.textContent = data.output;
+                });
+        });
+    </script>
+</body>
+</html>
