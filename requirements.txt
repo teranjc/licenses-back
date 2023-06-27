@@ -1,4 +1,4 @@
-﻿anyio==3.6.2
+anyio==3.6.2
 bcrypt==4.0.1
 blabel==0.1.6
 Brotli==1.0.9
@@ -23,6 +23,7 @@ html5lib==1.1
 idna==3.4
 Jinja2==3.1.2
 MarkupSafe==2.1.2
+numpy==1.24.1
 openpyxl==3.1.0
 pandas==1.5.3
 passlib==1.7.4
