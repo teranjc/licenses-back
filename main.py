@@ -31,4 +31,4 @@ app.include_router(license_route, prefix="/api")
 app.include_router(user_route, prefix="/api")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="licenses-back.vercel.app", port=8000, reload=True)
