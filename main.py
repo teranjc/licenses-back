@@ -20,10 +20,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/app")
-async def index(request: Request):
-    return {"hello word"}
-
 load_dotenv()
 app.include_router(auth_route, prefix="/api")
 app.include_router(license_route, prefix="/api")
