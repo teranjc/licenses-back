@@ -20,7 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+@app.get("/app")
 async def index(request: Request):
     return {"hello word"}
 
