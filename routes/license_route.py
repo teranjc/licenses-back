@@ -61,3 +61,10 @@ async def validate_license(model: LicensesDisabled):
         return LicenseRepository.validate_license(model)
     except HTTPException as e:
         raise HTTPException(status_code=e.status_code, detail={"status": e.status_code, "message": e.detail})
+
+@license_route.post("/licenses/check", status_code=status.HTTP_200_OK)
+async def expired_license(model: LicensesDisabled):
+    try:
+        return LicenseRepository.expire_license(model)
+    except HTTPException as e:
+        raise HTTPException(status_code=e.status_code, detail={"status": e.status_code, "message": e.detail})

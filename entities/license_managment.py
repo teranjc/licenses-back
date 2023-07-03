@@ -34,6 +34,7 @@ class Licenses(db.Entity):
     date_created = Required(datetime)
     status = Required(int)
     is_redeemed = Required(bool)
+    containers = Set('Container')
 
     def todict(self):
         return {
@@ -45,6 +46,39 @@ class Licenses(db.Entity):
             'date_expiration': self.date_expiration.strftime('%Y-%m-%d %H:%M:%S'),
             'date_created': self.date_created.strftime('%Y-%m-%d %H:%M:%S'),
             'status': self.status
+        }
+
+
+class Container(db.Entity):
+    id_container = PrimaryKey(int, auto=True)
+    ip = Required(str)
+    user = Required(str)
+    password = Required(str)
+    port = Required(int)
+    path = Required(str)
+    project = Required(str)
+    fk_license_id = Optional(Licenses)
+
+    def todict(self):
+        return {
+            'id_container': self.id_container,
+            'ip': self.ip,
+            'user': self.user,
+            'password': self.password,
+            'port': self.port,
+            'path': self.path,
+            'project': self.project,
+            'license': self.fk_license_id.todict()
+        }
+    def todict_without_license(self):
+        return {
+            'id_container': self.id_container,
+            'ip': self.ip,
+            'user': self.user,
+            'password': self.password,
+            'port': self.port,
+            'path': self.path,
+            'project': self.project
         }
 
 

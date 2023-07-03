@@ -1,10 +1,11 @@
 import datetime
 
 from fastapi import HTTPException, status
-from pony.orm import db_session, select, desc, commit
-from models.schemas import Licenses as LicenseModel, LicensesDisabled
-from entities.license_managment import Licenses, Countries, Users
+from pony.orm import db_session, select, desc, commit, left_join
+from models.schemas import Licenses as LicenseModel, LicensesDisabled, LicenseValid
+from entities.license_managment import Licenses, Countries, Users, Container
 from config.utils import Hash
+import paramiko
 
 
 class LicenseRepository:
@@ -15,8 +16,8 @@ class LicenseRepository:
 
                 list_licenses = list()
 
-                licenses = select(l for l in Licenses)
-                for license in licenses:
+                licenses = left_join((l, c) for l in Licenses for c in l.containers)
+                for license, container in licenses:
                     list_licenses.append({
                         "id_license": license.id_license, "type": license.type,
                         "fk_country_id": license.fk_country_id.todict(),
@@ -24,7 +25,8 @@ class LicenseRepository:
                         "key": license.key,
                         "date_expiration": license.date_expiration,
                         "date_created": license.date_created,
-                        "status": license.status
+                        "status": license.status,
+                        "has_container": False if container is None else True
                     })
 
                 return {
@@ -45,7 +47,7 @@ class LicenseRepository:
                                             )
 
                     new_license = Licenses(type=license.type, fk_country_id=country,
-                                           name_unit=license.name_unit, key=license.key,
+                                           name_unit=license.name_unit.strip(), key=license.key,
                                            date_expiration=license.date_expiration,
                                            date_created=datetime.datetime.now(), status=1
                                            , is_redeemed=False
@@ -147,12 +149,62 @@ class LicenseRepository:
                         status_code=status.HTTP_202_ACCEPTED,
                         detail=f"La contraseña es incorrecta"
                     )
+
+                container = select(c for c in Container if c.fk_license_id == licence_db).get()
+                if container is None:
+                    raise HTTPException(status_code=404, detail="La licencia no tiene asgnado un contenedor")
+
+                print(container.todict())
+
+                # Configuración de conexión SSH
+                host = container.ip
+                username = container.user
+                password = container.password
+                port = container.port
+
+                # Comandos a ejecutar
+                comandos = [
+                    f'cd {container.path} && docker-compose down'
+                ]
+
+                # Crear una instancia de SSHClient
+                ssh = paramiko.SSHClient()
+                try:
+
+                    # Aceptar automáticamente las claves de host desconocidas
+                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+                    # Conexión al servidor
+                    ssh.connect(host, port=port, username=username, password=password)
+
+                    # Ejecutar los comandos en serie
+                    for comando in comandos:
+                        stdin, stdout, stderr = ssh.exec_command(comando)
+                        salida = stdout.read().decode('utf-8')
+                        error = stderr.read().decode('utf-8')
+                        print(f'Salida del comando "{comando}": {salida}')
+                        print(f'Error del comando "{comando}": {error}')
+
+                except paramiko.AuthenticationException:
+                    print("Error de autenticación. Verifica las credenciales de conexión.")
+                except paramiko.SSHException as ssh_exc:
+                    print(f"Error en la conexión SSH: {str(ssh_exc)}")
+                except paramiko.ssh_exception.NoValidConnectionsError:
+                    print(
+                        "No se pudo establecer una conexión SSH. Verifica la dirección IP y la disponibilidad del servidor.")
+                except Exception as e:
+                    print(f"Error inesperado: {str(e)}")
+
+                finally:
+                    # Cerrar la conexión SSH
+                    ssh.close()
+
                 # Actualizar los campos solo si se proporcionan en la solicitud
                 # TODO realizar la conexion al contenedor y bajarlo
                 licence_db.set(status=3)
                 commit()
                 return {
-                    "response": "Licencia pausada correctamente"
+                    "response": "Licencia suspendida correctamente"
                 }
 
         except HTTPException as e:
@@ -185,6 +237,56 @@ class LicenseRepository:
                 licence_db.set(date_expiration=license.date_expiration)
                 licence_db.set(status=1)
                 commit()
+
+                container = select(c for c in Container if c.fk_license_id == licence_db).get()
+                if container is None:
+                    raise HTTPException(status_code=404, detail="La licencia no tiene asgnado un contenedor")
+
+                print(container.todict())
+
+                # Configuración de conexión SSH
+                host = container.ip
+                username = container.user
+                password = container.password
+                port = container.port
+
+                # Comandos a ejecutar
+                comandos = [
+                    f'cd {container.path} && docker-compose up -d --build'
+                ]
+
+                # Crear una instancia de SSHClient
+                ssh = paramiko.SSHClient()
+                try:
+
+                    # Aceptar automáticamente las claves de host desconocidas
+                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+                    # Conexión al servidor
+                    ssh.connect(host, port=port, username=username, password=password)
+
+                    # Ejecutar los comandos en serie
+                    for comando in comandos:
+                        stdin, stdout, stderr = ssh.exec_command(comando)
+                        salida = stdout.read().decode('utf-8')
+                        error = stderr.read().decode('utf-8')
+                        print(f'Salida del comando "{comando}": {salida}')
+                        print(f'Error del comando "{comando}": {error}')
+
+                except paramiko.AuthenticationException:
+                    print("Error de autenticación. Verifica las credenciales de conexión.")
+                except paramiko.SSHException as ssh_exc:
+                    print(f"Error en la conexión SSH: {str(ssh_exc)}")
+                except paramiko.ssh_exception.NoValidConnectionsError:
+                    print(
+                        "No se pudo establecer una conexión SSH. Verifica la dirección IP y la disponibilidad del servidor.")
+                except Exception as e:
+                    print(f"Error inesperado: {str(e)}")
+
+                finally:
+                    # Cerrar la conexión SSH
+                    ssh.close()
+
                 return {
                     "response": "Licencia renovada correctamente"
                 }
@@ -211,6 +313,34 @@ class LicenseRepository:
                     "response": "Licencia activada correctamente",
                     "date_expiration": licence_db.date_expiration
                 }
+
+        except HTTPException as e:
+            raise HTTPException(status_code=e.status_code, detail=f"{str(e.detail)}")
+
+    def expire_license(license: LicensesDisabled):
+        try:
+            with db_session:
+                licence_db = select(l for l in Licenses if l.key == license.key).get()
+                name_unit_cleaned = licence_db.name_unit.replace('\t', '')
+                license_check = LicenseValid(
+                    id_license=licence_db.id_license, key=licence_db.key,
+                    date_expiration=licence_db.date_expiration,
+                    status=licence_db.status,
+                    name_unit=name_unit_cleaned,
+                    country_name=licence_db.fk_country_id.name
+                )
+                if licence_db is None:
+                    raise HTTPException(status_code=404, detail="Esta licencia no es valida")
+
+                if licence_db.date_expiration <= datetime.datetime.now():
+                    licence_db.set(status=2)
+                    commit()
+                    return {"message": "Esta licencia ya ha expirado", "license": license_check}
+                else:
+                    return {
+                        "message": "Licencia activa",
+                        "license": license_check
+                    }
 
         except HTTPException as e:
             raise HTTPException(status_code=e.status_code, detail=f"{str(e.detail)}")

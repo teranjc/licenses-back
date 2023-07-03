@@ -62,6 +62,16 @@ class Licenses(BaseModel):
         }
 
 
+class ContainerModel(BaseModel):
+    id_container: Optional[int]
+    ip: Optional[str]
+    user: Optional[str]
+    password: Optional[str]
+    port: Optional[int]
+    path: Optional[str]
+    project: Optional[str]
+    license: Optional[int]
+
 class LicensesDisabled(BaseModel):
     id_license: Optional[int]
     password: Optional[str]
@@ -69,9 +79,19 @@ class LicensesDisabled(BaseModel):
     date_expiration: Optional[datetime]
 
 
+class LicenseValid(BaseModel):
+    id_license: int
+    key: str
+    date_expiration: datetime
+    status: int
+    name_unit: str
+    country_name: str
+
+
 class LicensesDelete(BaseModel):
     id_license: Optional[int]
     password: Optional[str]
+
 
 class Login(BaseModel):
     email: str
